@@ -1,0 +1,74 @@
+---
+title: "CHP395_Presentation"
+author: "Talia Duffy, taliagd2"
+date: "2024-09-10"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data = read.csv("jan_6_data.csv")
+data
+```
+
+```{r}
+data_long = pivot_longer(
+  data = data, 
+  cols = c("approve", "disapprove"),
+  names_to = "opinion",
+  values_to = "percent"
+)
+data_long
+```
+
+
+```{r}
+dem = data_long[data_long["party"] == "dem",]
+rep = data_long[data_long["party"] == "rep",]
+indep = data_long[data_long["party"] == "indep",]
+all = data_long[data_long["party"] == "all",]
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+ggplot(rep, aes(x = months, y = percent, color = opinion)) + 
+  geom_line() + 
+  geom_point(size = 2.5, alpha = 0.6) +
+  theme_bw() +
+  scale_color_manual(values = c("firebrick1", "maroon")) +
+  ggtitle("Republican Opinion of January 6 Over Time") +
+  xlab("Months since January 6, 2021") +
+  scale_y_continuous(limits = c(0,100), n.breaks = 10) +
+  scale_x_continuous(limits = c(0, 40), n.breaks = 10)
+```
+
+```{r}
+ggplot(dem, aes(x = months, y = percent, color = opinion)) + 
+  geom_line() + 
+  geom_point(size = 2.5, alpha = 0.6) +
+  theme_bw() +
+  scale_color_manual(values = c("deepskyblue3", "blue3")) +
+  ggtitle("Democrat Opinion of January 6 Over Time") +
+  xlab("Months since January 6, 2021") +
+  scale_y_continuous(limits = c(0,100), n.breaks = 10) +
+  scale_x_continuous(limits = c(0, 40), n.breaks = 10)
+```
+
+```{r}
+ggplot(all, aes(x = months, y = percent, color = opinion)) + 
+  geom_line() + 
+  geom_point(size = 2.5, alpha = 0.6) +
+  theme_bw() +
+  scale_color_manual(values = c("mediumpurple1", "blueviolet")) +
+  ggtitle("Overall Opinion of January 6 Over Time") +
+  xlab("Months since January 6, 2021") +
+  scale_y_continuous(limits = c(0,100), n.breaks = 10)+
+  scale_x_continuous(limits = c(0, 40), n.breaks = 10)
+```
+

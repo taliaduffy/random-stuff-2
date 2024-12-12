@@ -1,0 +1,129 @@
+---
+title: "fivethirtyeight2016analysis"
+author: "Talia Duffy, taliagd2"
+date: "2024-11-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+df = read.csv("fivethirtyeight2016.csv")
+head(df)
+```
+trump change is the difference between trump's actual performance and his 538 predicted vote share.
+negative numbers means 538 underpredicted trump's performance.
+
+```{r}
+df$trump_change = df$trump_538 - df$trump_actual
+df$clinton_change = df$clinton_538 - df$clinton_actual
+head(df)
+```
+
+What is the percentage of states that underpredicted?
+
+```{r}
+sum(df$trump_change < 0) / nrow(df)
+```
+
+states sorted by how much they missed trump
+
+```{r}
+library(tidyverse)
+df |>
+  arrange(trump_change)
+```
+
+```{r}
+df |>
+  arrange(clinton_change)
+```
+
+
+
+How much did they miss trump in swing states?
+
+Wisconsin, Michigan, Pennsylvania, NH, Nevada, North Carolina, Florida, Ohio, Arizona, Iowa, Georgia, Minnesota, Colorado, Maine
+
+```{r}
+swing_states = c("Wisconsin", "Michigan", "Pennsylvania", "New Hampshire", "Nevada", "North Carolina", "Florida", "Ohio", "Arizona", "Iowa", "Georgia", "Minnesota", "Colorado", "Maine statewide")
+
+df_swing_states = df |>
+  filter(state %in% swing_states) |>
+  arrange(trump_change)
+
+df_swing_states
+```
+
+
+```{r}
+ggplot(data = df_swing_states) +
+  aes(
+    x = reorder(state, trump_change), 
+    y = trump_change,
+    fill = trump_change < 0
+  ) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(labels = c("overpredicted", "underpredicted"), values = c("lightgreen", "firebrick"))+
+  geom_hline(yintercept = 0, col = "black")+
+  scale_y_continuous(breaks = seq(-5,1,0.5)) +
+  scale_x_discrete(guide = guide_axis(angle = 45)) +
+  theme_bw() +
+  theme(
+    plot.title=element_text(face="bold"), 
+    plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "inches"),
+    axis.title.x = element_text(margin=margin(t=10)),
+    axis.title.y = element_text(margin=margin(r=15))
+  ) +
+  ggtitle(
+    "How Much Did 538 Miss Trump in Key 2016 Swing States?",
+    subtitle = "Difference Between Predicted and Actual Vote Percentage"
+  ) +
+  xlab("State") +
+  ylab("Percentage Point Difference") +
+  labs(fill = "")
+  
+```
+```{r}
+usa = map_data("state")
+usa = usa |>
+  rename(state = region)
+df$state = tolower(df$state)
+df = df |>
+  mutate(state = str_replace_all(string = state, pattern = " statewide", replacement = "")) |>
+  mutate(state = str_replace_all(string = state, pattern = "d.c.", replacement = "district of columbia"))
+```
+
+```{r}
+df_usa_merge = inner_join(df, usa)
+```
+
+
+```{r}
+ggplot(data = df_usa_merge) + 
+  aes(x = long, y = lat, group = group, fill=trump_change) +
+  geom_polygon(color="black") +
+  scale_fill_gradient2(
+    name="Percentage Point Difference", 
+    low = "firebrick", 
+    mid = "white",
+    high = "green3",
+    limits = c(-9,9), 
+    breaks=c(-9,-4.5,0,4.5, 9), 
+    na.value = "grey50"
+  ) +
+  theme_void() +
+  theme(
+    plot.title=element_text(face="bold"), 
+    plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "inches"),
+    legend.position = "bottom"
+  ) +
+  ggtitle(
+    "How Much Did 538 Miss Trump Nationwide?",
+    subtitle = "Difference Between Predicted and Actual Vote Percentage"
+  )
+```
+
+
