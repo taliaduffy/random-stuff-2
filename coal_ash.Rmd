@@ -1,0 +1,408 @@
+---
+title: "Coal Ash Data Analysis"
+author: "Talia Duffy, taliagd2"
+date: "2025-04-23"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r imports}
+library(tidyverse)
+```
+
+
+```{r data}
+coal_df = read.csv("coal_ash.csv")
+coal_df
+```
+```{r illinois}
+coal_df_il = coal_df |>
+  filter(State == "IL")
+```
+
+```{r il map data}
+usa = map_data("county")
+illinois = usa |>
+  filter(region == "illinois")
+illinois
+```
+
+
+```{r il map}
+ggplot() +
+  geom_polygon(
+    data = illinois, 
+    aes(x = long, y = lat, group = group),
+    color = "black", fill = "white"
+  ) +
+  expand_limits(x = c(-93,-85)) +
+  geom_point(
+    data = coal_df_il, 
+    aes(x = Long, y = Lat, color = Impoundment.Hazard.Rating),
+    size = 3,
+    alpha = 0.5
+  ) +
+  scale_color_manual(
+    "Hazard Rating",
+    values = c(
+      "High" = "red", 
+      "Significant" = "gold",
+      "Low" = "forestgreen",
+      "Incised" = "blue",
+      "Unknown" = "purple",
+      "NA - Landfill" = "purple"
+    ),
+    breaks = c(
+      "High",
+      "Significant",
+      "Low",
+      "Incised",
+      "Unknown",
+      "NA - Landfill"
+    )
+  )+
+  #geom_point(
+  #  data = data.frame(
+  #    Long = -87.735,
+  #    Lat = 40.140
+  #  ),
+  #  aes(x = Long, y = Lat),
+  #  color = "pink",
+  #  size = 5
+  #) +
+  theme_classic() +
+  ggtitle(
+    "Coal ash ponds in Illinois, colored by hazard level"
+  ) +
+  xlab("Longitude") +
+  ylab("Latitude")
+```
+
+```{r top 10}
+coal_df_state_count = coal_df |>
+  group_by(State) |>
+  summarise(Count = n()) |>
+  arrange(desc(Count))
+coal_df_top10 = coal_df_state_count[1:10,]
+coal_df_top10
+```
+```{r top10 plot}
+ggplot(
+  data = coal_df_top10,
+  aes(x = State, y = Count)
+) +
+  geom_bar(stat = "identity", fill = "lightblue4") +
+  scale_x_discrete(limits = coal_df_top10$State) +
+  scale_y_continuous(breaks = seq(from = 0, to = 60, by = 5)) +
+  theme_bw() +
+  ylab("Number of coal ash ponds") +
+  ggtitle(
+    "Top 10 states with the most coal ash ponds, 2022", 
+    subtitle = "Illinois ranks third in the country with 45 coal ash ponds"
+  )
+```
+
+```{r count by liner type}
+coal_df_liner_count = coal_df |>
+  group_by(Liner.Status) |>
+  summarise(Count = n())
+coal_df_liner_count
+```
+
+```{r pie chart liner type}
+ggplot(coal_df_liner_count, aes(x="", y=Count, fill=Liner.Status)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+
+  theme_void() +
+  theme(
+    plot.title = element_text(face="bold"), 
+    plot.margin = unit(c(0.25, 0.05, 0.05, 0.05), "inches"),
+  )+
+  ggtitle(
+    "Proportion of Lined vs Unlined Coal Ash Ponds in the United States",
+    subtitle = "Unlined ponds do not meet regulatory standards."
+  )
+  
+```
+
+```{r vermilion df}
+df_vermilion = read.csv("vermilion_pollutants.csv")
+#df_vermillion$Mean.concentration = gsub(",", "", df_vermillion$Mean.concentration)
+#df_vermillion$Mean.concentration = as.numeric(df_vermillion$Mean.concentration)
+#df_vermillion$Maximum.concentration = gsub(",", "", df_vermillion$Maximum.concentration)
+#df_vermillion$Maximum.concentration = as.numeric(df_vermillion$Maximum.concentration)
+#
+df_vermilion$exceeds2011 = 
+  as.numeric(df_vermilion$Health.threshold < df_vermilion$Maximum.concentration..2011.)
+df_vermilion$exceeds2018 = 
+  as.numeric(df_vermilion$Health.threshold < df_vermilion$Maximum.concentration..2018.)
+
+sum(df_vermilion$exceeds2011)
+sum(df_vermilion$exceeds2018)
+```
+
+```{r pollutants}
+unique(df_vermilion$Pollutant)
+```
+
+
+```{r pollutant sub dfs}
+df_vermilion_boron = df_vermilion |>
+  filter(Pollutant == "Boron (mg/L)")
+df_vermilion_manganese = df_vermilion |>
+  filter(Pollutant == "Manganese (mg/L)")
+df_vermilion_sulfate = df_vermilion |>
+  filter(Pollutant == "Sulfate (mg/L)")
+df_vermilion_arsenic = df_vermilion |>
+  filter(Pollutant == "Arsenic (μg/L)")
+```
+
+```{r pivot boron}
+df_vermilion_boron_longer = pivot_longer(
+  data = df_vermilion_boron,
+  cols = starts_with("Max"),
+  names_to = "Year",
+  names_prefix = "Maximum.concentration..",
+  values_to = "Maximum.concentration"
+)
+df_vermilion_boron_longer$Year = ifelse(df_vermilion_boron_longer$Year == "2011.", "2011", "2018")
+#df_vermilion_boron_longer
+```
+
+
+```{r boron plot}
+#grouped bar chart with 2011 next to 2018 and horizontal line for health threshold
+ggplot(
+  data = df_vermilion_boron_longer,
+  aes(x = Well, y = Maximum.concentration, fill = Year)
+) +
+  geom_bar(
+    stat = "identity",
+    position = "dodge"
+  ) + 
+  scale_fill_manual(
+    values = c("deepskyblue", "deepskyblue4")
+  ) +
+  geom_hline(
+    aes(
+      yintercept = 3, 
+      linetype = "Health threshold"
+    ),
+    color = "red",
+    size = 1
+  ) +
+  scale_linetype_manual(
+    name = "",
+    values = 2,
+    guide = guide_legend(override.aes = list(color = "red"))
+  ) +
+  scale_y_continuous(
+    breaks = seq(from = 0, to = 60, by = 10)
+  ) +
+  theme_bw() +
+  ylab("Maximum Concentration (mg/L)") +
+  ggtitle("Maximum concentration of Boron in Vermilion Power Station wells",
+          subtitle = "2011 vs 2018"
+  ) +
+  theme(
+    plot.title = element_text(face="bold"),
+    plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "inches")
+  )
+```
+
+
+```{r pivot manganese}
+df_vermilion_manganese_longer = pivot_longer(
+  data = df_vermilion_manganese,
+  cols = starts_with("Max"),
+  names_to = "Year",
+  names_prefix = "Maximum.concentration..",
+  values_to = "Maximum.concentration"
+)
+df_vermilion_manganese_longer$Year = ifelse(df_vermilion_manganese_longer$Year == "2011.", "2011", "2018")
+df_vermilion_manganese_longer
+```
+
+
+```{r manganese plot}
+#grouped bar chart with 2011 next to 2018 and horizontal line for health threshold
+ggplot(
+  data = df_vermilion_manganese_longer,
+  aes(x = Well, y = Maximum.concentration, fill = Year)
+) +
+  geom_bar(
+    stat = "identity",
+    position = "dodge"
+  ) + 
+  scale_fill_manual(
+    values = c("mediumorchid1", "darkorchid4")
+  ) +
+  geom_hline(
+    aes(
+      yintercept = 0.3, 
+      linetype = "Health threshold"
+    ),
+    color = "red",
+    size = 1
+  ) +
+  scale_linetype_manual(
+    name = "",
+    values = 2,
+    guide = guide_legend(override.aes = list(color = "red"))
+  ) +
+  scale_y_continuous(
+    breaks = seq(from = 0, to = 2, by = 0.25)
+  ) +
+  theme_bw() +
+  ylab("Maximum Concentration (mg/L)") +
+  ggtitle("Maximum concentration of Manganese in Vermilion Power Station wells",
+          subtitle = "2011 vs 2018"
+  ) +
+  theme(
+    plot.title = element_text(face="bold"),
+    plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "inches")
+  )
+```
+
+```{r pivot sulfate}
+df_vermilion_sulfate_longer = pivot_longer(
+  data = df_vermilion_sulfate,
+  cols = starts_with("Max"),
+  names_to = "Year",
+  names_prefix = "Maximum.concentration..",
+  values_to = "Maximum.concentration"
+)
+df_vermilion_sulfate_longer$Year = ifelse(df_vermilion_sulfate_longer$Year == "2011.", "2011", "2018")
+#df_vermilion_sulfate_longer
+```
+
+
+```{r sulfate plot}
+#grouped bar chart with 2011 next to 2018 and horizontal line for health threshold
+ggplot(
+  data = df_vermilion_sulfate_longer,
+  aes(x = Well, y = Maximum.concentration, fill = Year)
+) +
+  geom_bar(
+    stat = "identity",
+    position = "dodge"
+  ) + 
+  scale_fill_manual(
+    values = c("darkolivegreen2", "forestgreen")
+  ) +
+  geom_hline(
+    aes(
+      yintercept = 500, 
+      linetype = "Health threshold"
+    ),
+    color = "red",
+    size = 1
+  ) +
+  scale_linetype_manual(
+    name = "",
+    values = 2,
+    guide = guide_legend(override.aes = list(color = "red"))
+  ) +
+  scale_y_continuous(
+    breaks = seq(from = 0, to = 2000, by = 250)
+  ) +
+  theme_bw() +
+  ylab("Maximum Concentration (mg/L)") +
+  ggtitle("Maximum concentration of Sulfate in Vermilion Power Station wells",
+          subtitle = "2011 vs 2018"
+  ) +
+  theme(
+    plot.title = element_text(face="bold"),
+    plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "inches")
+  )
+```
+
+```{r pivot arsenic}
+df_vermilion_arsenic_longer = pivot_longer(
+  data = df_vermilion_arsenic,
+  cols = starts_with("Max"),
+  names_to = "Year",
+  names_prefix = "Maximum.concentration..",
+  values_to = "Maximum.concentration"
+)
+df_vermilion_arsenic_longer$Year = ifelse(df_vermilion_arsenic_longer$Year == "2011.", "2011", "2018")
+#df_vermilion_arsenic_longer
+```
+
+
+```{r arsenic plot}
+#grouped bar chart with 2011 next to 2018 and horizontal line for health threshold
+ggplot(
+  data = df_vermilion_arsenic_longer,
+  aes(x = Well, y = Maximum.concentration, fill = Year)
+) +
+  geom_bar(
+    stat = "identity",
+    position = "dodge"
+  ) + 
+  scale_fill_manual(
+    values = c("gold", "darkgoldenrod3")
+  ) +
+  geom_hline(
+    aes(
+      yintercept = 10, 
+      linetype = "Health threshold"
+    ),
+    color = "red",
+    size = 1
+  ) +
+  scale_linetype_manual(
+    name = "",
+    values = 2,
+    guide = guide_legend(override.aes = list(color = "red"))
+  ) +
+  scale_y_continuous(
+    breaks = seq(from = 0, to = 80, by = 10)
+  ) +
+  theme_bw() +
+  ylab("Maximum Concentration (ug/L)") +
+  ggtitle("Maximum concentration of Arsenic in Vermilion Power Station wells",
+          subtitle = "2011 vs 2018"
+  ) +
+  theme(
+    plot.title = element_text(face="bold"),
+    plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "inches")
+  )
+```
+
+```{r}
+#coal_df_il$X1.mi.Radius.Pop = gsub(",", "", coal_df_il$X1.mi.Radius.Pop)
+#coal_df_il$X1.mi.Radius.Pop = as.numeric(coal_df_il$X1.mi.Radius.Pop)
+#
+#coal_df$X1.mi.Radius.Pop = gsub(",", "", coal_df$X1.mi.Radius.Pop)
+#coal_df$X1.mi.Radius.Pop = as.numeric(coal_df$X1.mi.Radius.Pop)
+```
+
+
+```{r}
+#mean(coal_df_il$X1.mi.Radius.Pop == 0)
+#mean(coal_df$X1.mi.Radius.Pop == 0)
+```
+
+```{r}
+#pop = data.frame(
+#  groups = c("0-50", "50-500", "500-1000", ""
+#)
+```
+
+```{r}
+#coal_df_nonzeropop = coal_df |>
+#  filter(X1.mi.Radius.Pop != 0)
+```
+
+
+```{r}
+#ggplot(coal_df_nonzeropop, aes(x = X1.mi.Radius.Pop)) +
+#  geom_histogram(bins = 10) +
+#  theme_bw()
+```
+
+
